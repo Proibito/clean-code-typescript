@@ -29,7 +29,7 @@ adapted for TypeScript. This is not a style guide. It's a guide to producing
 [readable, reusable, and refactorable](https://github.com/ryanmcdermott/3rs-of-software-architecture) software in TypeScript.
 
 Not every principle herein has to be strictly followed, and even fewer will be
-universally agreed upon. These are guidelines and nothing more, but they are
+universally agreed upon. These are guidelines and nothing more, but they are casse
 ones codified over many years of collective experience by the authors of
 *Clean Code*.
 
