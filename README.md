@@ -119,7 +119,7 @@ function getUser(): User;
 
 ### Use searchable names
 
-We will read more code than we will ever write. It's important that the code we do write must be readable and searchable. By *not* naming variables that end up being meaningful for understanding our program, we hurt our readers. Make your names searchable. Tools like [TSLint](https://palantir.github.io/tslint/rules/no-magic-numbers/) can help identify unnamed constants.
+We will read more code than we will ever write. It's important that the code we do write must be readable and searchable. By *not* naming variables that end up being meaningful for understanding our program, we hurt our readers. Make your names searchable. Tools like [ESLint](https://typescript-eslint.io/) can help identify unnamed constants (also known as magic strings and magic numbers).
 
 **Bad:**
 
@@ -132,9 +132,9 @@ setTimeout(restart, 86400000);
 
 ```ts
 // Declare them as capitalized named constants.
-const MILLISECONDS_IN_A_DAY = 24 * 60 * 60 * 1000;
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000; // 86400000
 
-setTimeout(restart, MILLISECONDS_IN_A_DAY);
+setTimeout(restart, MILLISECONDS_PER_DAY);
 ```
 
 **[⬆ back to top](#table-of-contents)**
@@ -372,7 +372,7 @@ This is by far the most important rule in software engineering. When functions d
 **Bad:**
 
 ```ts
-function emailClients(clients: Client[]) {
+function emailActiveClients(clients: Client[]) {
   clients.forEach((client) => {
     const clientRecord = database.lookup(client);
     if (clientRecord.isActive()) {
@@ -385,7 +385,7 @@ function emailClients(clients: Client[]) {
 **Good:**
 
 ```ts
-function emailClients(clients: Client[]) {
+function emailActiveClients(clients: Client[]) {
   clients.filter(isActiveClient).forEach(email);
 }
 
@@ -563,7 +563,7 @@ class Manager {
   }
 }
 
-function showEmployeeList(employee: Developer | Manager) {
+function showEmployeeList(employee: (Developer | Manager)[]) {
   employee.forEach((employee) => {
     const expectedSalary = employee.calculateExpectedSalary();
     const experience = employee.getExperience();
@@ -578,6 +578,25 @@ function showEmployeeList(employee: Developer | Manager) {
     render(data);
   });
 }
+```
+
+You may also consider adding a union type, or common parent class if it suits your abstraction.
+```ts
+class Developer {
+  // ...
+}
+
+class Manager {
+  // ...
+}
+
+type Employee = Developer | Manager
+
+function showEmployeeList(employee: Employee[]) {
+  // ...
+  });
+}
+
 ```
 
 You should be critical about code duplication. Sometimes there is a tradeoff between duplicated code and increased complexity by introducing unnecessary abstraction. When two implementations from two different modules look similar but live in different domains, duplication might be acceptable and preferred over extracting the common code. The extracted common code, in this case, introduces an indirect dependency between the two modules.
@@ -621,6 +640,24 @@ function createMenu(config: MenuConfig) {
 
 createMenu({ body: 'Bar' });
 ```
+
+Or, you could use the spread operator:
+
+```ts
+function createMenu(config: MenuConfig) {
+  const menuConfig = {
+    title: 'Foo',
+    body: 'Bar',
+    buttonText: 'Baz',
+    cancellable: true,
+    ...config,
+  };
+
+  // ...
+}
+```
+The spread operator and `Object.assign()` are very similar.
+The main difference is that spreading defines new properties, while `Object.assign()` sets them. More detailed, the difference is explained in [this](https://stackoverflow.com/questions/32925460/object-spread-vs-object-assign) thread.
 
 Alternatively, you can use destructuring with default values:
 
@@ -714,17 +751,19 @@ console.log(name);
 
 ### Avoid Side Effects (part 2)
 
-In JavaScript, primitives are passed by value and objects/arrays are passed by reference. In the case of objects and arrays, if your function makes a change in a shopping cart array, for example, by adding an item to purchase, then any other function that uses that `cart` array will be affected by this addition. That may be great, however, it can be bad too. Let's imagine a bad situation:  
+Browsers and Node.js process only JavaScript, therefore any TypeScript code has to be compiled before running or debugging.  In JavaScript, some values are unchangeable (immutable) and some are changeable (mutable). Objects and arrays are two kinds of mutable values so it's important to handle them carefully when they're passed as parameters to a function. A JavaScript function can change an object's properties or alter the contents of an array which could easily cause bugs elsewhere.
 
-The user clicks the "Purchase", a button which calls a `purchase` function that spawns a network request and sends the `cart` array to the server. Because of a bad network connection, the purchase function has to keep retrying the request. Now, what if in the meantime the user accidentally clicks "Add to Cart" button on an item they don't actually want before the network request begins? If that happens and the network request begins, then that purchase function will send the accidentally added item because it has a reference to a shopping cart array that the `addItemToCart` function modified by adding an unwanted item.  
+Suppose there's a function that accepts an array parameter representing a shopping cart. If the function makes a change in that shopping cart array - by adding an item to purchase, for example - then any other function that uses that same `cart` array will be affected by this addition. That may be great, however it could also be bad. Let's imagine a bad situation:
 
-A great solution would be for the `addItemToCart` to always clone the `cart`, edit it, and return the clone. This ensures that no other functions that are holding onto a reference to the shopping cart will be affected by any changes.  
+The user clicks the "Purchase" button which calls a `purchase` function that spawns a network request and sends the `cart` array to the server. Because of a bad network connection, the `purchase` function has to keep retrying the request. Now, what if in the meantime the user accidentally clicks an "Add to Cart" button on an item they don't actually want before the network request begins? If that happens and the network request begins, then that purchase function will send the accidentally added item because the `cart` array was modified.
+
+A great solution would be for the `addItemToCart` function to always clone the `cart`, edit it, and return the clone. This would ensure that functions that are still using the old shopping cart wouldn't be affected by the changes.
 
 Two caveats to mention to this approach:
 
 1. There might be cases where you actually want to modify the input object, but when you adopt this programming practice you will find that those cases are pretty rare. Most things can be refactored to have no side effects! (see [pure function](https://en.wikipedia.org/wiki/Pure_function))
 
-2. Cloning big objects can be very expensive in terms of performance. Luckily, this isn't a big issue in practice because there are great libraries that allow this kind of programming approach to be fast and not as memory intensive as it would be for you to manually clone objects and arrays.
+2. Cloning big objects can be very expensive in terms of performance. Luckily, this isn't a big issue in practice because there are [great libraries](https://github.com/immutable-js/immutable-js) that allow this kind of programming approach to be fast and not as memory intensive as it would be for you to manually clone objects and arrays.
 
 **Bad:**
 
@@ -878,7 +917,7 @@ function isEmailUsed(email: string): boolean {
   // ...
 }
 
-if (!isEmailUsed(node)) {
+if (!isEmailUsed(email)) {
   // ...
 }
 ```
@@ -1254,15 +1293,15 @@ interface Config {
 }
 ```
 
-Case of Array, you can create a read-only array by using `ReadonlyArray<T>`.
-do not allow changes such as `push()` and `fill()`, but can use features such as `concat()` and `slice()` that do not change the value.
+For arrays, you can create a read-only array by using `ReadonlyArray<T>`.
+It doesn't allow changes such as `push()` and `fill()`, but can use features such as `concat()` and `slice()` that do not change the array's value.
 
 **Bad:**
 
 ```ts
 const array: number[] = [ 1, 3, 5 ];
 array = []; // error
-array.push(100); // array will updated
+array.push(100); // array will be updated
 ```
 
 **Good:**
@@ -2050,7 +2089,7 @@ class ReportReader {
 
 // ...
 const reader = new ReportReader();
-await report = await reader.read('report.xml');
+const report = await reader.read('report.xml');
 ```
 
 **Good:**
@@ -2094,11 +2133,11 @@ class ReportReader {
 
 // ...
 const reader = new ReportReader(new XmlFormatter());
-await report = await reader.read('report.xml');
+const report = await reader.read('report.xml');
 
 // or if we had to read a json report
 const reader = new ReportReader(new JsonFormatter());
-await report = await reader.read('report.json');
+const report = await reader.read('report.json');
 ```
 
 **[⬆ back to top](#table-of-contents)**
@@ -2323,15 +2362,15 @@ import { promisify } from 'util';
 
 const write = promisify(writeFile);
 
-async function downloadPage(url: string, saveTo: string): Promise<string> {
+async function downloadPage(url: string): Promise<string> {
   const response = await get(url);
-  await write(saveTo, response);
   return response;
 }
 
 // somewhere in an async function
 try {
-  const content = await downloadPage('https://en.wikipedia.org/wiki/Robert_Cecil_Martin', 'article.html');
+  const content = await downloadPage('https://en.wikipedia.org/wiki/Robert_Cecil_Martin');
+  await write('article.html', content);
   console.log(content);
 } catch (error) {
   console.error(error);
@@ -2488,23 +2527,19 @@ try {
 
 Formatting is subjective. Like many rules herein, there is no hard and fast rule that you must follow. The main point is *DO NOT ARGUE* over formatting. There are tons of tools to automate this. Use one! It's a waste of time and money for engineers to argue over formatting. The general rule to follow is *keep consistent formatting rules*.  
 
-For TypeScript there is a powerful tool called [TSLint](https://palantir.github.io/tslint/). It's a static analysis tool that can help you improve dramatically the readability and maintainability of your code. There are ready to use TSLint configurations that you can reference in your projects:
+For TypeScript there is a powerful tool called [ESLint](https://typescript-eslint.io/). It's a static analysis tool that can help you improve dramatically the readability and maintainability of your code. There are ready to use ESLint configurations that you can reference in your projects:
 
-- [TSLint Config Standard](https://www.npmjs.com/package/tslint-config-standard) - standard style rules
+- [ESLint Config Airbnb](https://www.npmjs.com/package/eslint-config-airbnb-typescript) - Airbnb style guide
 
-- [TSLint Config Airbnb](https://www.npmjs.com/package/tslint-config-airbnb) - Airbnb style guide
+- [ESLint Base Style Config](https://www.npmjs.com/package/eslint-plugin-base-style-config) - a Set of Essential ESLint rules for JS, TS and React
 
-- [TSLint Clean Code](https://www.npmjs.com/package/tslint-clean-code) - TSLint rules inspired by the [Clean Code: A Handbook of Agile Software Craftsmanship](https://www.amazon.ca/Clean-Code-Handbook-Software-Craftsmanship/dp/0132350882)
-
-- [TSLint react](https://www.npmjs.com/package/tslint-react) - lint rules related to React & JSX
-
-- [TSLint + Prettier](https://www.npmjs.com/package/tslint-config-prettier) - lint rules for [Prettier](https://github.com/prettier/prettier) code formatter
-
-- [ESLint rules for TSLint](https://www.npmjs.com/package/tslint-eslint-rules) - ESLint rules for TypeScript
-
-- [Immutable](https://www.npmjs.com/package/tslint-immutable) - rules to disable mutation in TypeScript
+- [ESLint + Prettier](https://www.npmjs.com/package/eslint-config-prettier) - lint rules for [Prettier](https://github.com/prettier/prettier) code formatter
 
 Refer also to this great [TypeScript StyleGuide and Coding Conventions](https://basarat.gitbook.io/typescript/styleguide) source.
+
+### Migrating from TSLint to ESLint
+
+If you are looking for help in migrating from TSLint to ESLint, you can check out this project: <https://github.com/typescript-eslint/tslint-to-eslint-config>
 
 ### Use consistent capitalization
 
@@ -2535,6 +2570,9 @@ const DAYS_IN_MONTH = 30;
 const SONGS = ['Back In Black', 'Stairway to Heaven', 'Hey Jude'];
 const ARTISTS = ['ACDC', 'Led Zeppelin', 'The Beatles'];
 
+const discography = getArtistDiscography('ACDC');
+const beatlesSongs = SONGS.filter((song) => isBeatlesSong(song));
+
 function eraseDatabase() {}
 function restoreDatabase() {}
 
@@ -2544,6 +2582,7 @@ type Container = { /* ... */ }
 
 Prefer using `PascalCase` for class, interface, type and namespace names.  
 Prefer using `camelCase` for variables, functions and class members.
+Prefer using capitalized `SNAKE_CASE` for constants.
 
 **[⬆ back to top](#table-of-contents)**
 
@@ -2644,6 +2683,7 @@ With clean and easy to read import statements you can quickly see the dependenci
 - Unused imports should be removed.
 - Named imports must be alphabetized (i.e. `import {A, B, C} from 'foo';`)
 - Import sources must be alphabetized within groups, i.e.: `import * as foo from 'a'; import * as bar from 'b';`
+- Prefer using `import type` instead of `import` when importing only types from a file to avoid dependency cycles, as these imports are erased at runtime
 - Groups of imports are delineated by blank lines.
 - Groups must respect following order:
   - Polyfills (i.e. `import 'reflect-metadata';`)
@@ -2658,6 +2698,7 @@ With clean and easy to read import statements you can quickly see the dependenci
 ```ts
 import { TypeDefinition } from '../types/typeDefinition';
 import { AttributeTypes } from '../model/attribute';
+import { Customer, Credentials } from '../model/types';
 import { ApiCredentials, Adapters } from './common/api/authorization';
 import fs from 'fs';
 import { ConfigPlugin } from './plugins/config/configPlugin';
@@ -2675,6 +2716,7 @@ import { BindingScopeEnum, Container } from 'inversify';
 
 import { AttributeTypes } from '../model/attribute';
 import { TypeDefinition } from '../types/typeDefinition';
+import type { Customer, Credentials } from '../model/types';
 
 import { ApiCredentials, Adapters } from './common/api/authorization';
 import { ConfigPlugin } from './plugins/config/configPlugin';
@@ -2906,3 +2948,5 @@ This is also available in other languages:
 References will be added once translations are completed.  
 Check this [discussion](https://github.com/labs42io/clean-code-typescript/issues/15) for more details and progress.
 You can make an indispensable contribution to *Clean Code* community by translating this to your language.
+
+**[⬆ back to top](#table-of-contents)**
